@@ -234,7 +234,32 @@ export default function BurdenlessAssistant() {
     setMessages(prev => prev.map(m => m.id !== msgId ? m : { ...m, followupSaved: { ...m.followupSaved, [blockIdx]: true } }));
     setFollowups(prev => [...prev, { id: Date.now().toString(), ...data, savedAt: new Date().toLocaleTimeString() }]);
   }
-
+async function finishJob() {
+    if (invoice.length === 0 && followups.length === 0) {
+      alert("Nothing to send — no change orders or follow-ups logged yet.");
+      return;
+    }
+    if (!confirm("Send job summary email to the boss and reset the app?")) return;
+    try {
+      const res = await fetch("/api/finish-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobInfo, invoice, followups, partsUsed: [] }),
+      });
+      if (res.ok) {
+        alert("✓ Job summary sent! Resetting app for next job.");
+        setInvoice([]);
+        setFollowups([]);
+        setMessages([{ id: "init", role: "assistant", content: "Hey — Burdenless Field Assistant online. What are you working on?" }]);
+        setJobInfo({ tech: "Technician", address: "Job Site", unit: "" });
+        setTab("chat");
+      } else {
+        alert("⚠️ Could not send email. Check connection.");
+      }
+    } catch (e) {
+      alert("⚠️ Error sending summary.");
+    }
+  }
   const invoiceTotal = invoice.reduce((s, i) => s + i.total, 0);
   const tabStyle = (active) => ({ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: active ? "#1e3a6b" : "transparent", color: active ? "#7eb8f7" : "#4a5568", fontWeight: active ? 700 : 500, fontSize: 12, cursor: "pointer" });
   const cardStyle = { background: "#1a2236", border: "1px solid #2a3a54", borderRadius: 12, padding: 14, marginBottom: 12 };
@@ -291,6 +316,9 @@ export default function BurdenlessAssistant() {
       )}
 
       {tab === "invoice" && (
+       <button onClick={finishJob} style={{ width: "100%", background: "linear-gradient(135deg,#dc2626,#991b1b)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 16, letterSpacing: 0.5 }}>
+            🏁 Finish Job &amp; Send Summary
+          </button>
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div><div style={{ fontWeight: 700, fontSize: 16 }}>Invoice</div><div style={{ color: "#4a6a9a", fontSize: 12 }}>{jobInfo.address} · {jobInfo.tech}</div></div>
