@@ -10,12 +10,12 @@ const DBS = {
 };
 
 export default async function handler(req, res) {
-  const { db, query } = req.body || {};
+  const { db } = req.body || {};
   if (!DBS[db]) return res.status(400).json({ error: "Unknown database" });
 
   try {
-    const response = await notion.databases.query({
-      database_id: DBS[db],
+    const response = await notion.dataSources.query({
+      data_source_id: DBS[db],
       page_size: 50,
     });
     const items = response.results.map((p) => {

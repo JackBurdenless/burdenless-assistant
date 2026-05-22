@@ -12,8 +12,8 @@ const DBS = {
 async function queryNotion(db) {
   if (!DBS[db]) return null;
   try {
-    const response = await notion.databases.query({
-      database_id: DBS[db],
+    const response = await notion.dataSources.query({
+      data_source_id: DBS[db],
       page_size: 50,
     });
     return response.results.map((p) => {
