@@ -1,11 +1,40 @@
 import { Resend } from "resend";
+import { Client } from "@notionhq/client";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+
+const INVENTORY_DB = "e96750e6-e789-4730-a4c1-3fbaf86c1cb4";
+
+async function getLowStock() {
+  try {
+    const response = await notion.dataSources.query({
+      data_source_id: INVENTORY_DB,
+      page_size: 50,
+    });
+    const lowStock = [];
+    for (const p of response.results) {
+      const props = p.properties;
+      const name = props["Part Name"]?.title?.map(t => t.plain_text).join("") || "";
+      const qty = props["Qty In Stock"]?.number ?? 0;
+      const threshold = props["Reorder Threshold"]?.number ?? 0;
+      const supplier = props["Supplier"]?.rich_text?.map(t => t.plain_text).join("") || "";
+      const partNum = props["Part Number"]?.rich_text?.map(t => t.plain_text).join("") || "";
+      if (qty <= threshold && threshold > 0) {
+        lowStock.push({ name, partNum, qty, threshold, supplier });
+      }
+    }
+    return lowStock;
+  } catch (e) {
+    return [];
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const { jobInfo, invoice, followups, partsUsed } = req.body;
+  const lowStock = await getLowStock();
 
   const total = invoice.reduce((s, i) => s + i.total, 0);
   const endTime = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
@@ -53,6 +82,25 @@ export default async function handler(req, res) {
           `).join("")}
         ` : ""}
 
+        ${lowStock.length > 0 ? `
+          <h2 style="margin:20px 0 8px;color:#991b1b;font-size:16px;">⚠️ Low Stock Alerts (${lowStock.length})</h2>
+          <div style="background:#fef2f2;border-radius:8px;padding:14px;border-left:3px solid #dc2626;">
+            ${lowStock.map(item => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #fecaca;">
+                <div>
+                  <div style="font-weight:600;font-size:13px;color:#991b1b;">${item.name}</div>
+                  <div style="font-size:11px;color:#666;">${item.partNum} · ${item.supplier}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:13px;font-weight:700;color:#dc2626;">${item.qty} in stock</div>
+                  <div style="font-size:11px;color:#888;">reorder at ${item.threshold}</div>
+                </div>
+              </div>
+            `).join("")}
+            <div style="font-size:12px;color:#666;margin-top:10px;font-style:italic;">Reorder these parts to avoid running out on the next job.</div>
+          </div>
+        ` : ""}
+
         ${partsUsed && partsUsed.length > 0 ? `
           <h2 style="margin:20px 0 8px;color:#0f2744;font-size:16px;">Parts Used</h2>
           <ul style="font-size:13px;color:#555;padding-left:20px;">
@@ -71,10 +119,10 @@ export default async function handler(req, res) {
     await resend.emails.send({
       from: "Burdenless Assistant <onboarding@resend.dev>",
       to: process.env.BOSS_EMAIL,
-      subject: `🏁 Job Complete: ${jobInfo.tech || "Tech"} @ ${jobInfo.address || "Job Site"} — $${total.toFixed(2)}`,
+      subject: `🏁 Job Complete: ${jobInfo.tech || "Tech"} @ ${jobInfo.address || "Job Site"} — $${total.toFixed(2)}${lowStock.length > 0 ? ` · ⚠️ ${lowStock.length} low stock` : ""}`,
       html,
     });
-    res.status(200).json({ success: true });
+    res.status(200).json({ success: true, lowStockCount: lowStock.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
