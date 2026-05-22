@@ -316,7 +316,8 @@ async function finishJob() {
       )}
 
       {tab === "invoice" && (
-       <button onClick={finishJob} style={{ width: "100%", background: "linear-gradient(135deg,#dc2626,#991b1b)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 16, letterSpacing: 0.5 }}>
+        <>
+          <button onClick={finishJob} style={{ width: "100%", background: "linear-gradient(135deg,#dc2626,#991b1b)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 16, letterSpacing: 0.5 }}>
             🏁 Finish Job &amp; Send Summary
           </button>
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
@@ -350,6 +351,7 @@ async function finishJob() {
             </div>
           ))}
         </div>
+      </>
       )}
 
       {tab === "followups" && (
